@@ -12,7 +12,11 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 ENV_FILE="$ROOT/env/${ENV}.env"
-[ -f "$ENV_FILE" ] || { echo "missing $ENV_FILE" >&2; exit 1; }
+if [ ! -f "$ENV_FILE" ]; then
+  echo "missing $ENV_FILE" >&2
+  echo "run: cp env/${ENV}.env.example env/${ENV}.env && \$EDITOR env/${ENV}.env" >&2
+  exit 1
+fi
 set -a; . "$ENV_FILE"; set +a
 
 if [ -f "$ROOT/env/secrets.env" ]; then

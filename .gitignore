@@ -1,4 +1,6 @@
 env/secrets.env
+env/integration.env
+env/production.env
 *.env.local
 .DS_Store
 .idea/

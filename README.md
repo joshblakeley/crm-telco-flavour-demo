@@ -56,20 +56,26 @@ they reach Salesforce.
 # 1. Pick an env (integration or production)
 export ENV=integration   # or: production
 
-# 2. Drop the Salesforce client_secret into env/secrets.env (gitignored)
+# 2. Fill in your cluster IDs / URLs (env/<env>.env is gitignored).
+#    See the *.example file for where to find each value.
+cp env/integration.env.example env/integration.env
+$EDITOR env/integration.env
+# repeat for production.env if you want to provision both
+
+# 3. Drop the Salesforce client_secret into env/secrets.env (also gitignored)
 cp env/secrets.env.example env/secrets.env
 $EDITOR env/secrets.env
 
-# 3. Log in to rpai for the right env. The -p flag prevents the
+# 4. Log in to rpai for the right env. The -p flag prevents the
 #    "Already logged in to default profile" short-circuit when you
 #    already have credentials in another rpai profile.
 RPAI_ENV=integration rpai -p integration auth login    # integration
 # rpai auth login                                      # production
 
-# 4. Bring everything up
+# 5. Bring everything up
 make up
 
-# 5. Smoke-test the agent end-to-end
+# 6. Smoke-test the agent end-to-end
 make smoke
 ```
 
