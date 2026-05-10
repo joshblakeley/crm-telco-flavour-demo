@@ -40,26 +40,38 @@ require_token() {
 
 # --- dataplane API helpers (cluster secrets, agents) ---------------------
 
-dp_get()  { curl -sS -H "Authorization: Bearer $TOKEN" "$DATAPLANE_API$1"; }
-dp_post() { curl -sS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" "$DATAPLANE_API$1" --data "$2"; }
-dp_put()  { curl -sS -X PUT  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" "$DATAPLANE_API$1" --data "$2"; }
-dp_del()  { curl -sS -X DELETE -H "Authorization: Bearer $TOKEN" "$DATAPLANE_API$1"; }
+# `_curl` is a status-aware wrapper. On 4xx/5xx it dumps the response and
+# exits non-zero, which propagates via `set -e` into the calling script.
+# All API helpers go through this so silent auth failures can't corrupt
+# state (creating SERVICE_ACCOUNT_NULL etc.).
+_curl() {
+  local method="$1" url="$2" body="${3:-}"
+  local tmp; tmp="$(mktemp)"
+  local args=(-sS -o "$tmp" -w '%{http_code}' -X "$method" -H "Authorization: Bearer $TOKEN")
+  case "$method" in POST|PUT|PATCH) args+=(-H "Content-Type: application/json"); esac
+  case "$url" in *AIAgentService*) args+=(-H "Connect-Protocol-Version: 1");; esac
+  [ -n "$body" ] && args+=(--data "$body")
+  local code; code="$(curl "${args[@]}" "$url")"
+  case "$code" in
+    2*) cat "$tmp"; rm -f "$tmp" ;;
+    *)  printf 'HTTP %s on %s %s\n%s\n' "$code" "$method" "$url" "$(cat "$tmp")" >&2
+        rm -f "$tmp"; return 1 ;;
+  esac
+}
+
+dp_get()  { _curl GET    "$DATAPLANE_API$1"; }
+dp_post() { _curl POST   "$DATAPLANE_API$1" "$2"; }
+dp_put()  { _curl PUT    "$DATAPLANE_API$1" "$2"; }
+dp_del()  { _curl DELETE "$DATAPLANE_API$1"; }
 
 # Connect-RPC against the dataplane (used for AIAgentService).
-dp_rpc() {
-  local procedure="$1" body="$2"
-  curl -sS -X POST \
-    -H "Authorization: Bearer $TOKEN" \
-    -H "Content-Type: application/json" \
-    -H "Connect-Protocol-Version: 1" \
-    "$DATAPLANE_API/$procedure" --data "$body"
-}
+dp_rpc() { _curl POST "$DATAPLANE_API/$1" "$2"; }
 
 # --- controlplane (IAM service accounts) ---------------------------------
 
-cp_get()  { curl -sS -H "Authorization: Bearer $TOKEN" "$CONTROLPLANE_API$1"; }
-cp_post() { curl -sS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" "$CONTROLPLANE_API$1" --data "$2"; }
-cp_del()  { curl -sS -X DELETE -H "Authorization: Bearer $TOKEN" "$CONTROLPLANE_API$1"; }
+cp_get()  { _curl GET    "$CONTROLPLANE_API$1"; }
+cp_post() { _curl POST   "$CONTROLPLANE_API$1" "$2"; }
+cp_del()  { _curl DELETE "$CONTROLPLANE_API$1"; }
 
 # --- Salesforce MCP shortcuts via rpai ----------------------------------
 

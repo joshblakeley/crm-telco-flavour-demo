@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 # Idempotently create or update the AIAgent (v1alpha3) wired to the
 # salesforce MCP and the cluster's Anthropic LLM provider.
+#
+# Subagent topology (read/write split, gateway-enforced via tool_filter_regex):
+#
+#   parent: Telco CRM Agent
+#   ├─ crm_reader   → salesforce MCP, regex: ^(query|query_more|search|list_objects|describe_object|get_record)$
+#   └─ crm_writer   → salesforce MCP, regex: ^(create_record|update_record|delete_record)$
+#
+# The parent's own salesforce MCP reference is also restricted to read-only
+# so writes can ONLY happen via crm_writer dispatch (audit trail beat).
 
 . "$(dirname "$0")/_lib.sh"
 require_token
@@ -10,7 +19,12 @@ SA_ID="$(cat "$STATE_DIR/sa_id" 2>/dev/null || true)"
 [ -n "$SA_ID" ] || die "missing $STATE_DIR/sa_id; run 03-service-account.sh first"
 SA_ID_UPPER="$(printf '%s' "$SA_ID" | upper)"
 
-SYSTEM_PROMPT="$(cat "$ROOT/config/system-prompt.md")"
+PARENT_PROMPT="$(cat "$ROOT/config/system-prompt.md")"
+READER_PROMPT="$(cat "$ROOT/config/subagents/crm-reader.md")"
+WRITER_PROMPT="$(cat "$ROOT/config/subagents/crm-writer.md")"
+
+READ_REGEX='^(query|query_more|search|list_objects|describe_object|get_record)$'
+WRITE_REGEX='^(create_record|update_record|delete_record)$'
 
 # Find existing agent by displayName.
 LIST="$(dp_rpc redpanda.api.dataplane.v1alpha3.AIAgentService/ListAIAgents '{}')"
@@ -21,13 +35,17 @@ AGENT_ID="$(echo "$LIST" | jq -r --arg n "$AGENT_DISPLAY_NAME" '.aiAgents[]? | s
 # real `$` is a footgun, this sidesteps it.
 SPEC_FIELDS="$(jq -nc \
   --arg dn "$AGENT_DISPLAY_NAME" \
-  --arg desc "Customer-success agent reasoning over Salesforce CRM via the salesforce MCP." \
+  --arg desc "Customer-success agent reasoning over Salesforce CRM. Dispatches reads to crm_reader and writes to crm_writer (gateway-enforced split via tool_filter_regex)." \
   --arg model "$LLM_MODEL" \
-  --arg sp "$SYSTEM_PROMPT" \
+  --arg sp "$PARENT_PROMPT" \
   --arg llm "$LLM_PROVIDER" \
   --arg mcp "$MCP_NAME" \
   --arg sa "$SA_ID_UPPER" \
   --arg env "$ENV" \
+  --arg readre "$READ_REGEX" \
+  --arg writere "$WRITE_REGEX" \
+  --arg readsp "$READER_PROMPT" \
+  --arg writesp "$WRITER_PROMPT" \
   '{
     displayName:$dn,
     description:$desc,
@@ -35,7 +53,19 @@ SPEC_FIELDS="$(jq -nc \
     systemPrompt:$sp,
     provider:{anthropic:{}},
     gateway:{llmProvider:$llm},
-    mcpServers:{($mcp):{id:$mcp}},
+    mcpServers:{($mcp):{id:$mcp, toolFilterRegex:$readre}},
+    subagents:{
+      crm_reader:{
+        description:"Read-only Salesforce CRM lookups (accounts, opportunities, cases, schema). Use for any observational query.",
+        systemPrompt:$readsp,
+        mcpServers:{($mcp):{id:$mcp, toolFilterRegex:$readre}}
+      },
+      crm_writer:{
+        description:"Salesforce mutations (create/update/delete records). Only call after gathering context via crm_reader and confirming with the user.",
+        systemPrompt:$writesp,
+        mcpServers:{($mcp):{id:$mcp, toolFilterRegex:$writere}}
+      }
+    },
     serviceAccount:{
       clientId:"__D__{secrets.SERVICE_ACCOUNT_\($sa).client_id}",
       clientSecret:"__D__{secrets.SERVICE_ACCOUNT_\($sa).client_secret}"
@@ -45,19 +75,22 @@ SPEC_FIELDS="$(jq -nc \
     tags:{demo:"telco", owner:"crm-telco-flavour-demo", env:$env}
   }' | sed 's/__D__/$/g')"
 
+# UpdateAIAgent on v1alpha3 has a fiddly fieldmask format that varies by
+# field (some accept top-level paths, some require the `ai_agent.` prefix,
+# the `subagents` map needs special handling). Rather than fight it, if
+# the agent already exists we delete + recreate. It's stateless config —
+# brief downtime, but reliable and reproduces the same end state.
 if [ -n "$AGENT_ID" ]; then
-  log "agent '$AGENT_DISPLAY_NAME' exists ($AGENT_ID) — updating"
-  BODY="$(jq -nc --arg id "$AGENT_ID" --argjson f "$SPEC_FIELDS" \
-    '{id:$id, aiAgent:$f, updateMask:"display_name,description,model,system_prompt,provider,gateway,mcp_servers,service_account,max_iterations,resources,tags"}')"
-  RESP="$(dp_rpc redpanda.api.dataplane.v1alpha3.AIAgentService/UpdateAIAgent "$BODY")"
-else
-  log "creating agent '$AGENT_DISPLAY_NAME'"
-  BODY="$(jq -nc --argjson f "$SPEC_FIELDS" '{aiAgent:$f}')"
-  RESP="$(dp_rpc redpanda.api.dataplane.v1alpha3.AIAgentService/CreateAIAgent "$BODY")"
-  AGENT_ID="$(echo "$RESP" | jq -r '.aiAgent.id')"
+  log "agent '$AGENT_DISPLAY_NAME' exists ($AGENT_ID) — deleting then recreating to apply latest config"
+  dp_rpc redpanda.api.dataplane.v1alpha3.AIAgentService/DeleteAIAgent "$(jq -nc --arg id "$AGENT_ID" '{id:$id}')" >/dev/null
 fi
 
-[ -n "$AGENT_ID" ] && [ "$AGENT_ID" != "null" ] || die "agent create/update failed: $RESP"
+log "creating agent '$AGENT_DISPLAY_NAME'"
+BODY="$(jq -nc --argjson f "$SPEC_FIELDS" '{aiAgent:$f}')"
+RESP="$(dp_rpc redpanda.api.dataplane.v1alpha3.AIAgentService/CreateAIAgent "$BODY")"
+AGENT_ID="$(echo "$RESP" | jq -r '.aiAgent.id')"
+
+[ -n "$AGENT_ID" ] && [ "$AGENT_ID" != "null" ] || die "agent create failed: $RESP"
 echo "$AGENT_ID" > "$STATE_DIR/agent_id"
 
 log "waiting for agent $AGENT_ID to reach RUNNING"
