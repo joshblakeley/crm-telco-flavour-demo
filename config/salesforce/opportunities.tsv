@@ -1,0 +1,13 @@
+AccountName	Name	Amount	StageName	CloseDate	Description
+TIM Sparkle Italia	Mediterranean Subsea Capacity Renewal	4500000	Negotiation/Review	2026-07-15	Renewal of 100G subsea capacity Genoa-Marseille; carrier-grade SLA.
+TIM Sparkle Italia	MENA IP Transit Expansion	1200000	Proposal/Price Quote	2026-08-30	Add 4x 10G transit ports for North Africa peering.
+WindTre Business	5G Backhaul Phase 3 - Rome Metro	8200000	Negotiation/Review	2026-06-30	Dark fiber + lit services to 380 cell sites across Lazio.
+WindTre Business	MPLS L3VPN Service Migration	2800000	Qualification	2026-09-15	Migrate legacy ATM circuits to IP-MPLS L3VPN.
+Iliad Italia Wholesale	National Backbone Capacity Upgrade	3400000	Proposal/Price Quote	2026-07-31	10G to 100G backbone uplift across 6 PoPs.
+Iliad Italia Wholesale	Subscriber-Grade DDoS Mitigation	950000	Closed Won	2026-04-10	Always-on DDoS scrubbing for retail subscriber base.
+Open Fiber S.p.A.	Northern Italy Edge POP Build-Out	12500000	Needs Analysis	2026-12-31	20 new edge POPs across Veneto/Lombardia for FTTH wholesale.
+Open Fiber S.p.A.	FTTH Wholesale Reseller Agreement	6800000	Closed Won	2026-03-22	3-year volume commit for last-mile fiber resale.
+AWS EMEA Connectivity	Milan IX Direct Connect 100G x4	1800000	Negotiation/Review	2026-06-15	Quad-100G private interconnect at Milan; 36-month term.
+AWS EMEA Connectivity	Frankfurt-Milan Cross-Border Capacity	3200000	Prospecting	2026-10-30	Multi-region private backbone for AZ-to-AZ replication.
+Sky Italia B2B	Streaming CDN Origin Capacity	2100000	Qualification	2026-08-15	Origin egress for OTT video; peak-hour scaling SLA.
+Sky Italia B2B	B2B Connectivity Resale Pilot	450000	Prospecting	2026-09-30	Pilot to resell metro Ethernet to Sky enterprise customers.

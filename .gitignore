@@ -1,0 +1,8 @@
+env/secrets.env
+*.env.local
+.DS_Store
+.idea/
+.vscode/
+*.bak
+*.tmp
+.state/

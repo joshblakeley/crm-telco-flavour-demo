@@ -1,0 +1,10 @@
+AccountName	Subject	Priority	Status	Origin	Type	Description
+TIM Sparkle Italia	Latency spike on Genoa-Marseille subsea route	High	Working	Phone	Problem	Customer reports 22ms RTT instead of baseline 15ms. NOC investigating; suspected cable degradation segment B.
+TIM Sparkle Italia	Quarterly capacity report request	Low	New	Email	Question	Q2 capacity utilization report needed for renewal discussion.
+WindTre Business	BGP session flapping at Milan PoP	High	Escalated	Phone	Problem	AS199698 peering on AS31034 unstable; flapping every 3-5 mins. Impacting 5G transport for Milan metro.
+WindTre Business	5G Phase 3 site provisioning timeline	Medium	Working	Web	Question	Need updated cutover schedule for 380 cell sites; affects Q3 RAN rollout.
+Iliad Italia Wholesale	DDoS scrubbing portal access issue	Medium	Closed	Web	Problem	Customer NOC team unable to log into mitigation portal. Resolved: SSO config corrected.
+Open Fiber S.p.A.	Wholesale provisioning API rate limit	Medium	Working	Web	Problem	Customer hitting 429s on /provision endpoint during bulk activations. Reviewing rate limit policy.
+Open Fiber S.p.A.	Edge POP site survey - Verona	Low	New	Email	Question	Site survey requested for proposed Verona edge POP location.
+AWS EMEA Connectivity	Direct Connect MTU negotiation failure	Critical	Working	Phone	Problem	Quad-100G LAG showing intermittent jumbo frame drops. Packet captures suggest MTU mismatch on customer side.
+Sky Italia B2B	Streaming peak-hour origin saturation	High	New	Phone	Problem	Champions League final caused 12-min origin saturation; customer requesting capacity guarantees for upcoming events.
