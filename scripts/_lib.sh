@@ -37,8 +37,12 @@ die()  { printf "%s[%s ✗]%s %s\n" "$c_red" "$ENV" "$c_reset" "$*" >&2; exit 1;
 # --- auth ----------------------------------------------------------------
 
 require_token() {
-  TOKEN="$(rpai auth token 2>/dev/null || true)"
-  [ -n "${TOKEN:-}" ] || die "no rpai token. Run: RPAI_ENV=$RPAI_ENV rpai auth login"
+  local profile_flag=""
+  [ -n "${RPAI_PROFILE:-}" ] && profile_flag="-p $RPAI_PROFILE"
+  TOKEN="$(rpai $profile_flag auth token 2>/dev/null || true)"
+  if [ -z "${TOKEN:-}" ]; then
+    die "no rpai token. Run: RPAI_ENV=${RPAI_ENV:-} rpai $profile_flag auth login"
+  fi
   export TOKEN
 }
 
